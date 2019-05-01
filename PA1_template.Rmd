@@ -1,25 +1,111 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: 'Reproducible Research: Peer Assessment 1'
+author: "Jianling Peng"
+date: "April 30, 2019"
+output: word_document
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2); library(dplyr)
+```
+
+### set up working directory
+```{r workingdirectory}
+setwd("C:/Users/jpeng11/coursera/Reproducilbe Research/RepData_PeerAssessment1")
+```
+## Downlodad data
+```{r, echo = T, results ='hide'}
+
+unzip(zipfile = "activity.zip", exdir = ".", unzip = "internal")
+```
 
 
 ## Loading and preprocessing the data
 
+```{r, echo = T, results = 'hide'}
+activity <- read.csv("activity.csv", stringsAsFactors = F, header = T)
+head(activity)
+activity$Date <- as.Date(activity$date, format = "%Y-%m-%d")
+```
 
 
-## What is mean total number of steps taken per day?
+## Histogram of the total number of steps taken each day
+```{r}
+daily_steps <- tapply(activity$steps, activity$Date, sum, na.rm = T)
+hist(daily_steps, xlab = "Steps", main = "Histogram of Daily Total Steps")
+```
 
+## What is mean and median number of steps  taken per day?
+```{r}
+mean_step <- mean(daily_steps, na.rm = T)
+median_step <- median(daily_steps, na.rm = T)
+```
 
+#### The mean steps of total number of steps taken per day is `r mean_step` 
+#### The meidan steps of total number of steps taken per day is `r median_step`
 
-## What is the average daily activity pattern?
+## Time series plot of the average number of steps taken
+```{r}
 
+intervals <- activity %>% group_by(interval) %>%
+    summarise(average = mean(steps, na.rm = T))
+gg <- ggplot(data = intervals, aes(x = interval, y = average)) + geom_line() 
+gg + labs(y = "Number of Steps")
 
+max_step <- intervals %>% filter(average == max(average))
+max_interval <- max_step$interval
 
-## Imputing missing values
+```
+#### the interval `r max_interval`, on average across all the days in the dataset, contain the maximum number of steps, which is `r max_step$average`.
 
+## Total number of missing values
+
+```{r}
+miss_num <- sum(!complete.cases(activity))
+```
+#### Total number of missing values in the dataset is `r miss_num`.
+
+## Imputing missing values with mean value for each interval
+
+```{r}
+imputed_activity <- activity
+for (i in 1:dim(imputed_activity)[1]) {
+    
+    if (is.na(imputed_activity$steps[i])){
+        int <- imputed_activity$interval[i]
+        sub <-intervals[intervals$interval == int,]$average
+        imputed_activity$steps[i] <- sub
+    }
+    #else imputed_activity$steps <- imputed_activity$steps
+}
+```
+
+## Total number of steps take per day after imputing missing values
+
+```{r}
+
+daily_steps_imp <- tapply(imputed_activity$steps, imputed_activity$Date, sum, na.rm = T)
+hist(daily_steps_imp,xlab = "Steps", main = "Histogram of Daily Total Steps after Imputation")
+mean_step <- mean(daily_steps_imp)
+median_step <- median(daily_steps_imp)
+```
+
+#### The mean steps of total number of steps taken per day afterimputation  is `r mean_step` 
+#### The meidan steps of total number of steps taken per day after imputaion is `r median_step`
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+imputed_activity <- imputed_activity %>% 
+    mutate(wDay = ifelse((weekdays(Date) %in% c("Saturday", "Sunday")),
+                         "WEEKEND", "WEEKDAY")) %>% 
+    group_by(wDay, interval) %>% 
+    summarise(average= mean(steps))
+
+gg <- ggplot(imputed_activity, aes(x = interval, y = average)) + 
+    geom_line() + facet_grid(wDay ~.)
+gg + labs(y = "Average Number of Steps", title = "Average Number of Steps per  5-min Interval" )
+
+```
